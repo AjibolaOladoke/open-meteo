@@ -1,0 +1,219 @@
+import OmFileFormat
+import OmFileIO
+
+enum OmFileSeriesType: String {
+    case chunk
+    case year
+    case master
+    case linear_bias_seasonal
+    case rolling
+}
+
+enum OmFileType {
+    /// Timestamps are set for "data_run" files, timerangeDt is set for ensemble "rolling" files
+    typealias Value = (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?, timeRangeDt: TimerangeDt?)
+    
+    case domainChunk(domain: DomainRegistry, variable: String, type: OmFileSeriesType, chunk: Int?, ensembleMember: Int, previousDay: Int)
+    case staticFile(domain: DomainRegistry, variable: String, chunk: Int? = nil)
+    
+    /// Full forecast run horizon per run per variable. `data_run/<model>/<run>/<variable>.om`
+    case run(domain: DomainRegistry, variable: String, run: IsoDateTime)
+    
+    /// How often this file should be checked for modifications. Some files update every hour, some never update.
+    /*func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
+        switch self {
+        case .domainChunk(let domain, _, let type, let chunk, _, _):
+            switch type {
+            case .chunk:
+                guard let domain = domain.timeSeriesMetadata, let chunk else {
+                    return 24*3600
+                }
+                let chunkTime = Timestamp(chunk * domain.omFileLength * domain.dtSeconds) ..< Timestamp((chunk + 1) * domain.omFileLength * domain.dtSeconds)
+                
+                /// Chunk contains data older than 7 days or 2 times updateTime (seasonal forecast = 31 days)
+                /// Covers era5 with 5 days delay
+                /// Fore more precise checks, domain needs to report how much past data is updated
+                let chunkFinalised = chunkTime.upperBound < now.subtract(seconds: max(7*24*3600, domain.updateIntervalSeconds * 2))
+                if chunkFinalised {
+                    return 24*3600
+                }
+                if let modificationTime {
+                    if modificationTime < now.subtract(seconds: domain.updateIntervalSeconds / 2) {
+                        return 15*60
+                    }
+                    if modificationTime < now.subtract(seconds: Int(Double(domain.updateIntervalSeconds) * 0.9)) {
+                        return 3*60
+                    }
+                }
+                return 10*60
+            case .year:
+                return 24*3600
+            case .master:
+                return 24*3600
+            case .linear_bias_seasonal:
+                return 24*3600
+            case .rolling:
+                guard let domain = domain.timeSeriesMetadata else {
+                    return 24*3600
+                }
+                if let modificationTime {
+                    if modificationTime < now.subtract(seconds: domain.updateIntervalSeconds / 2) {
+                        return 15*60
+                    }
+                    if modificationTime < now.subtract(seconds: Int(Double(domain.updateIntervalSeconds) * 0.9)) {
+                        return 3*60
+                    }
+                }
+                return 10*60
+            }
+        case .staticFile(_, _, _):
+            return 24*3600
+        case .run(_, _, let run):
+            // If run is younger than 24 hours, check every 3 minutes
+            if run.toTimestamp() > now.subtract(hours: 24) {
+                return 3*60
+            }
+            return 24*3600
+        }
+    }*/
+    
+    /// Relative file path like `/dwd_icon/temperature_2m/chunk_1234.om`
+    func getRelativeFilePath() -> String {
+        switch self {
+        case .domainChunk(let domain, let variable, let type, let chunk, let ensembleMember, let previousDay):
+            let ensembleMember = ensembleMember > 0 ? "_member\(ensembleMember.zeroPadded(len: 2))" : ""
+            let previousDay = previousDay > 0 ? "_previous_day\(previousDay)" : ""
+            if let chunk {
+                return "\(domain.rawValue)/\(variable)\(previousDay)\(ensembleMember)/\(type)_\(chunk).om"
+            }
+            return "\(domain.rawValue)/\(variable)\(previousDay)\(ensembleMember)/\(type).om"
+        case .staticFile(let domain, let variable, let chunk):
+            if let chunk {
+                // E.g. DEM model '/copernicus_dem90/static/lat_-1.om'
+                return "\(domain.rawValue)/static/\(variable)_\(chunk).om"
+            }
+            return "\(domain.rawValue)/static/\(variable).om"
+        case .run(domain: let domain, variable: let variable, run: let run):
+            return "\(domain.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/\(variable).om"
+        }
+    }
+    
+    /// `./data/` or `./data_run/`
+    func getDataDirectoryPath() -> String {
+        switch self {
+        case .domainChunk(_, _, _, _, _, _):
+            return OpenMeteo.dataDirectory
+        case .staticFile(_, _, _):
+            return OpenMeteo.dataDirectory
+        case .run(_, _, _):
+            return OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory
+        }
+    }
+}
+
+extension OmFileType: OmFileManagable {
+    /// Relative file path like `data/dwd_icon/temperature_2m/chunk_1234.om`
+    func getRelativeFilePathWithData() -> String {
+        switch self {
+        case .domainChunk(let domain, let variable, let type, let chunk, let ensembleMember, let previousDay):
+            let ensembleMember = ensembleMember > 0 ? "_member\(ensembleMember.zeroPadded(len: 2))" : ""
+            let previousDay = previousDay > 0 ? "_previous_day\(previousDay)" : ""
+            if let chunk {
+                return "data/\(domain.rawValue)/\(variable)\(previousDay)\(ensembleMember)/\(type)_\(chunk).om"
+            }
+            return "data/\(domain.rawValue)/\(variable)\(previousDay)\(ensembleMember)/\(type).om"
+        case .staticFile(let domain, let variable, let chunk):
+            if let chunk {
+                // E.g. DEM model '/copernicus_dem90/static/lat_-1.om'
+                return "data/\(domain.rawValue)/static/\(variable)_\(chunk).om"
+            }
+            return "data/\(domain.rawValue)/static/\(variable).om"
+        case .run(domain: let domain, variable: let variable, run: let run):
+            return "data_run/\(domain.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/\(variable).om"
+        }
+    }
+    
+    typealias Payload = OmFileLocalRemoteOmReader
+}
+
+extension OmFileReaderArrayProtocol where OmType == Float {
+    /// Read interpolated between 4 points. Assuming dim0 is used for locations and dim1 is a time series
+    public func readInterpolated(dim0: GridPoint2DFraction, dim0Nx: Int, dim1 dim1Read: Range<Int>) async throws -> [Float] {
+        let gridpoint = dim0.gridpoint
+        
+        return try await readInterpolated(
+            dim0X: gridpoint % dim0Nx,
+            dim0XFraction: dim0.xFraction,
+            dim0Y: gridpoint / dim0Nx,
+            dim0YFraction: dim0.yFraction,
+            dim0Nx: dim0Nx,
+            dim1: dim1Read.toUInt64()
+        )
+    }
+
+    /// Read interpolated between 4 points. Assuming dim0 and dim1 are a spatial field
+    public func readInterpolated(pos: GridPoint2DFraction) async throws -> Float {
+        let dims = getDimensions()
+        guard dims.count == 2 else {
+            fatalError("Dimension count must be 2")
+        }
+        
+        return try await readInterpolated(
+            dim0: pos.gridpoint / Int(dims[1]),
+            dim0Fraction: pos.yFraction,
+            dim1: pos.gridpoint % Int(dims[1]),
+            dim1Fraction: pos.xFraction
+        )
+    }
+
+    /// Read interpolated between 4 points. If one point is NaN, ignore it.
+    /*public func readInterpolatedIgnoreNaN(dim0X: Int, dim0XFraction: Float, dim0Y: Int, dim0YFraction: Float, dim0Nx: Int, dim1 dim1Read: Range<Int>) throws -> [Float] {
+        
+        // reads 4 points. As 2 points are next to each other, we can read a small row of 2 elements at once
+        let top = try read(dim0Slow: dim0Y * dim0Nx + dim0X ..< dim0Y * dim0Nx + dim0X + 2, dim1: dim1Read)
+        let bottom = try read(dim0Slow: (dim0Y + 1) * dim0Nx + dim0X ..< (dim0Y + 1) * dim0Nx + dim0X + 2, dim1: dim1Read)
+        
+        // interpolate linearly between
+        let nt = dim1Read.count
+        return zip(zip(top[0..<nt], top[nt..<2*nt]), zip(bottom[0..<nt], bottom[nt..<2*nt])).map {
+            let ((a,b),(c,d)) = $0
+            var value: Float = 0
+            var weight: Float = 0
+            if !a.isNaN {
+                value += a * (1-dim0XFraction) * (1-dim0YFraction)
+                weight += (1-dim0XFraction) * (1-dim0YFraction)
+            }
+            if !b.isNaN {
+                value += b * (1-dim0XFraction) * (dim0YFraction)
+                weight += (1-dim0XFraction) * (dim0YFraction)
+            }
+            if !c.isNaN {
+                value += c * (dim0XFraction) * (1-dim0YFraction)
+                weight += (dim0XFraction) * (1-dim0YFraction)
+            }
+            if !d.isNaN {
+                value += d * (dim0XFraction) * (dim0YFraction)
+                weight += (dim0XFraction) * (dim0YFraction)
+            }
+            return weight > 0.001 ? value / weight : .nan
+        }
+    }*/
+}
+
+
+extension OmFileManagable {
+    /// Get the absolute file system path like `/var/lib/openmeteo-`
+    func getFilePath() -> String {
+        let path = getRelativeFilePathWithData()
+        if path.starts(with: "data/") {
+            return path.replacingOccurrences(of: "data/", with: OpenMeteo.dataDirectory)
+        }
+        if path.starts(with: "data_run/") {
+            return path.replacingOccurrences(of: "data_run/", with: OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory)
+        }
+        if path.starts(with: "data_spatial/") {
+            return path.replacingOccurrences(of: "data_spatial/", with: OpenMeteo.dataSpatialDirectory ?? OpenMeteo.dataDirectory)
+        }
+        fatalError("Unexpected data path \(path)")
+    }
+}
