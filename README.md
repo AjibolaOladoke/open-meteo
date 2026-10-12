@@ -6,7 +6,7 @@ A practical reference entry for product and engineering: the open-meteo notes, e
 
 ## Images
 
-[![open-meteo](images/preview.png)](https://github.com/Swift-Tech-Co)
+[![open-meteo](images/preview.png)](https://github.com/Swift-Tech-Co/open-meteo)
 
 ## Features
 
@@ -27,7 +27,6 @@ A practical reference entry for product and engineering: the open-meteo notes, e
 Open-Meteo uses open weather forecasts published by national weather services. These numerical weather predictions are free to download, but working with them requires expertise in binary file formats, grid systems, map projections, and weather forecasting.
 
 Open-Meteo combines high-resolution regional and global weather models. More than 5 TB of data is downloaded and processed daily from multiple national weather services. The processed data is stored in a custom file format optimized for compressed time-series access, such as retrieving a multi-day temperature forecast for one location.
-
 
 The API is available for non-commercial use at no cost. It combines frequently updated regional and global models to select suitable forecast data for locations worldwide.
 
@@ -122,26 +121,25 @@ Do you use Open-Meteo? Please open a pull request and add your repository or app
 
 ## Client SDKs
 
-- .Net 8 / C#: https://www.swifttechco.com
-- Android library for Geocoding API: https://www.swifttechco.com
-- Dart / Flutter: https://www.swifttechco.com
-- Dart / Flutter (all APIs, typed): https://www.swifttechco.com
-- Go: https://www.swifttechco.com
-- Kotlin: https://www.swifttechco.com
-- PHP for Geocoding API: https://www.swifttechco.com
-- PHP Laravel: https://www.swifttechco.com
-- PHP Symfony 6.2: https://www.swifttechco.com
-- Python: https://www.swifttechco.com
-- R: https://www.swifttechco.com
-- Rust: https://www.swifttechco.com
-- TypeScript: https://www.swifttechco.com
+- .Net 8 / C#: https://github.com/Swift-Tech-Co/open-meteo
+- Android library for Geocoding API: https://github.com/Swift-Tech-Co/open-meteo
+- Dart / Flutter: https://github.com/Swift-Tech-Co/open-meteo
+- Dart / Flutter (all APIs, typed): https://github.com/Swift-Tech-Co/open-meteo
+- Go: https://github.com/Swift-Tech-Co/open-meteo
+- Kotlin: https://github.com/Swift-Tech-Co/open-meteo
+- PHP for Geocoding API: https://github.com/Swift-Tech-Co/open-meteo
+- PHP Laravel: https://github.com/Swift-Tech-Co/open-meteo
+- PHP Symfony 6.2: https://github.com/Swift-Tech-Co/open-meteo
+- Python: https://github.com/Swift-Tech-Co/open-meteo
+- R: https://github.com/Swift-Tech-Co/open-meteo
+- Rust: https://github.com/Swift-Tech-Co/open-meteo
+- TypeScript: https://github.com/Swift-Tech-Co/open-meteo
 
 Contributions welcome! Writing a SDK for Open-Meteo is more than welcome and a great way to help users.
 
 ## Support
 
 If you encounter a bug, please open an issue. For general ideas, questions, and community support, use GitHub Discussions.
-
 
 ## Run your own API
 
@@ -169,10 +167,9 @@ API data is offered under the Attribution 4.0 International license (CC BY 4.0).
 
 You are free to share: copy and redistribute the material in any medium or format and adapt: remix, transform, and build upon the material.
 
-
 Include an attribution link next to any location where Open-Meteo data is displayed, for example:
 
-<a href="https://www.swifttechco.com">Weather data by Open-Meteo.com</a>
+<a href="https://github.com/Swift-Tech-Co/open-meteo">Weather data by Open-Meteo.com</a>
 
 ## Source Code License
 
@@ -192,13 +189,21 @@ Home | Services | Careers | Referral Program | Influencers | About | Contact
 
 **Connect**
 
-- Website: swifttechco.com
+- Website: https://github.com/Swift-Tech-Co/open-meteo
 - LinkedIn: [linkedin.com/in/stephenoladoke](https://www.linkedin.com/in/stephenoladoke/)
 - LinkedIn (Company): [linkedin.com/company/swift-tech-co](https://www.linkedin.com/company/swift-tech-co)
 - X: [@MrOladoke](https://x.com/MrOladoke)
 - Instagram: [@mr.oladoke](https://www.instagram.com/mr.oladoke/)
 - Instagram (Company): [@swifttechco](https://www.instagram.com/swifttechco/)
 - Organization: [github.com/Swift-Tech-Co](https://github.com/Swift-Tech-Co)
+
+## Sources
+
+Compiled and maintained from upstream [open-meteo/open-meteo](https://github.com/open-meteo/open-meteo) under permissive open-source license.
+
+---
+
+Maintained by [Swift Tech Co.](https://github.com/Swift-Tech-Co) - [Telegram](https://t.me/+Qt_eFvkb2rliMzNh)
 
 ## Sources
 
